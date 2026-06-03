@@ -184,6 +184,16 @@ const parseMessageValue = (value: Buffer) => {
   try {
     return JSON.parse(text);
   } catch {
+    // Avro-encoded STRING fields have a variable-length prefix before the JSON.
+    // Find the first '{' or '[' and try parsing from there.
+    const jsonStart = text.search(/[{\[]/);
+    if (jsonStart > 0) {
+      try {
+        return JSON.parse(text.substring(jsonStart));
+      } catch {
+        // fall through
+      }
+    }
     return text;
   }
 };
@@ -257,6 +267,18 @@ app.get("/api/kpis", (_req, res) => {
     inventoryTelemetry,
     maintenanceEvents,
     supplyEvents
+  });
+});
+
+app.get("/api/agent-debug", (_req, res) => {
+  res.json({
+    kafkaDisabled: KAFKA_DISABLED,
+    agentCount: agents.length,
+    agentDecisionCount: agentDecisions.length,
+    agents,
+    agentDecisions,
+    sseClients: clients.length,
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -388,12 +410,40 @@ if (KAFKA_DISABLED) {
     await consumer.subscribe({ topic: "ai.agent.supply", fromBeginning });
     await consumer.subscribe({ topic: "alerts.acks", fromBeginning });
 
+    const agentTopicCounts: Record<string, number> = {};
+    setInterval(() => {
+      const agentTopics = ["ai.agent.decisions", "ai.agent.machine_health", "ai.agent.quality", "ai.agent.supply"];
+      const summary = agentTopics.map(t => `${t}=${agentTopicCounts[t] ?? 0}`).join("  ");
+      console.log(`[agent-heartbeat] messages received: ${summary}`);
+    }, 10000);
+
     await consumer.run({
       eachMessage: async ({ topic, message }) => {
         try {
           if (!message.value) return;
+
+          if (topic.startsWith("ai.agent.")) {
+            agentTopicCounts[topic] = (agentTopicCounts[topic] ?? 0) + 1;
+            const msgTimestamp = message.timestamp ? new Date(Number(message.timestamp)).toISOString() : "no-ts";
+            const age = message.timestamp ? `${((Date.now() - Number(message.timestamp)) / 1000).toFixed(1)}s ago` : "unknown age";
+            console.log(`[agent-rx] ${topic} | offset=${message.offset} | produced=${msgTimestamp} | ${age} | size=${message.value.length}b`);
+            if (agentTopicCounts[topic] <= 3) {
+              const rawStr = message.value.toString().substring(0, 500);
+              console.log(`[agent-raw] ${topic} first bytes: [${message.value[0]}, ${message.value[1]}, ${message.value[2]}, ${message.value[3]}, ${message.value[4]}]`);
+              console.log(`[agent-raw] ${topic} text: ${rawStr}`);
+            }
+          }
+
           const parsed = parseMessageValue(message.value);
-          if (!parsed || typeof parsed !== "object") return;
+          if (!parsed || typeof parsed !== "object") {
+            if (topic.startsWith("ai.agent.")) {
+              console.log(`[agent-parse-fail] ${topic} parseMessageValue returned type=${typeof parsed} value=${JSON.stringify(parsed).substring(0, 300)}`);
+              // Try to parse the raw buffer as a string payload directly
+              const rawText = message.value.toString();
+              console.log(`[agent-parse-fail] ${topic} raw text: ${rawText.substring(0, 400)}`);
+            }
+            return;
+          }
           const payload = parsed as Record<string, any>;
 
           if (topic === "kpis.rollup") {

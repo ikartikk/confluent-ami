@@ -82,19 +82,17 @@ export default function DashboardPage() {
         />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-5">
-        <div className="lg:col-span-3">
-          <AgentPanel insights={[...stream.agentDecisions, ...stream.agents]
-            .sort((a, b) => {
-              const riskOrder: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-              const aRisk = riskOrder[a.riskLevel ?? "LOW"] ?? 4;
-              const bRisk = riskOrder[b.riskLevel ?? "LOW"] ?? 4;
-              if (aRisk !== bRisk) return aRisk - bRisk;
-              return new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime();
-            })
-            .slice(0, 20)} />
-        </div>
-        <div className="space-y-4 lg:col-span-2">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <AgentPanel insights={[...stream.agentDecisions, ...stream.agents]
+          .sort((a, b) => {
+            const riskOrder: Record<string, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+            const aRisk = riskOrder[a.riskLevel ?? "LOW"] ?? 4;
+            const bRisk = riskOrder[b.riskLevel ?? "LOW"] ?? 4;
+            if (aRisk !== bRisk) return aRisk - bRisk;
+            return new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime();
+          })
+          .slice(0, 20)} />
+        <div className="space-y-4">
           <EventFeed events={stream.anomalies} />
           <ChartCard
             title="Throughput Trend"

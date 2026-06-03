@@ -212,7 +212,7 @@ INSERT INTO `ai.agent.machine_health`
 SELECT
   CAST(NULL AS BYTES) AS key,
   agent_output.response AS payload
-FROM `insights.anomalies`,
+FROM `insights.anomalies` /*+ OPTIONS('scan.startup.mode'='latest-offset') */,
 LATERAL TABLE(
   AI_RUN_AGENT(
     'machine_health_agent',
@@ -228,7 +228,7 @@ INSERT INTO `ai.agent.quality`
 SELECT
   CAST(NULL AS BYTES) AS key,
   agent_output.response AS payload
-FROM `insights.anomalies`,
+FROM `insights.anomalies` /*+ OPTIONS('scan.startup.mode'='latest-offset') */,
 LATERAL TABLE(
   AI_RUN_AGENT(
     'quality_agent',
@@ -243,7 +243,7 @@ INSERT INTO `ai.agent.supply`
 SELECT
   CAST(NULL AS BYTES) AS key,
   agent_output.response AS payload
-FROM `insights.anomalies`,
+FROM `insights.anomalies` /*+ OPTIONS('scan.startup.mode'='latest-offset') */,
 LATERAL TABLE(
   AI_RUN_AGENT(
     'supply_agent',
@@ -258,7 +258,7 @@ INSERT INTO `ai.agent.decisions`
 SELECT
   CAST(NULL AS BYTES) AS key,
   agent_output.response AS payload
-FROM `insights.anomalies`,
+FROM `insights.anomalies` /*+ OPTIONS('scan.startup.mode'='latest-offset') */,
 LATERAL TABLE(
   AI_RUN_AGENT(
     'operations_agent',

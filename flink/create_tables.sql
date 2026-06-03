@@ -94,7 +94,8 @@ CREATE TABLE insights_anomalies (
   ts TIMESTAMP_LTZ(3),
   severity STRING,
   summary STRING,
-  agent_insights ARRAY<ROW<agent STRING, summary STRING>>
+  agent_insights ARRAY<ROW<agent STRING, summary STRING>>,
+  WATERMARK FOR ts AS ts - INTERVAL '5' SECOND
 ) WITH (
   'connector' = 'kafka',
   'topic' = 'insights.anomalies',
@@ -102,7 +103,8 @@ CREATE TABLE insights_anomalies (
   'properties.security.protocol' = 'SASL_SSL',
   'properties.sasl.mechanism' = 'PLAIN',
   'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_API_KEY}" password="${KAFKA_API_SECRET}";',
-  'format' = 'json'
+  'format' = 'json',
+  'scan.startup.mode' = 'latest-offset'
 );
 
 CREATE TABLE kpis_rollup (
