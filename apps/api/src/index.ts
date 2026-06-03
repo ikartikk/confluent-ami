@@ -186,6 +186,10 @@ const parsePayload = (raw: unknown): Record<string, any> => {
     if (typeof obj?.payload?.string === "string") {
       return parsePayload(obj.payload.string);
     }
+    // Sometimes payload is the raw JSON string directly
+    if (typeof obj?.payload === "string") {
+      return parsePayload(obj.payload);
+    }
     // Or as { string: "..." } when the outer payload is already unwrapped
     if (typeof obj?.string === "string" && Object.keys(obj).length <= 2) {
       return parsePayload(obj.string);
