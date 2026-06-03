@@ -255,6 +255,10 @@ export function StreamProvider({ children }: { children: ReactNode }) {
         try {
           const payload = JSON.parse(event.data);
           lastEventAtRef.current = Date.now();
+          if (process.env.NEXT_PUBLIC_DEBUG_STREAM === "true") {
+            const anomalyCount = Array.isArray(payload.anomalies) ? payload.anomalies.length : 0;
+            console.log(`[stream] message anomalies=${anomalyCount}`);
+          }
           pendingPayloadRef.current = payload;
           if (!flushTimerRef.current) {
             flushTimerRef.current = setTimeout(() => {

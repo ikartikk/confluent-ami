@@ -12,7 +12,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "@kafkajs/confluent-schema-registry": "^3.3.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

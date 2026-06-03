@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import { Kafka } from "kafkajs";
+import { SchemaRegistry } from "@kafkajs/confluent-schema-registry";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -126,6 +127,26 @@ const PORT = Number(process.env.API_PORT || 4000);
 const KAFKA_DISABLED =
   process.env.KAFKA_DISABLED === "true" || !process.env.CONFLUENT_BOOTSTRAP_SERVERS;
 
+const SCHEMA_REGISTRY_URL =
+  process.env.SCHEMA_REGISTRY_URL || process.env.CONFLUENT_SCHEMA_REGISTRY_URL;
+const SCHEMA_REGISTRY_API_KEY =
+  process.env.SCHEMA_REGISTRY_API_KEY ||
+  process.env.CONFLUENT_SCHEMA_REGISTRY_API_KEY ||
+  process.env.CONFLUENT_API_KEY;
+const SCHEMA_REGISTRY_API_SECRET =
+  process.env.SCHEMA_REGISTRY_API_SECRET ||
+  process.env.CONFLUENT_SCHEMA_REGISTRY_API_SECRET ||
+  process.env.CONFLUENT_API_SECRET;
+
+const schemaRegistry = SCHEMA_REGISTRY_URL
+  ? new SchemaRegistry({
+      host: SCHEMA_REGISTRY_URL,
+      auth: SCHEMA_REGISTRY_API_KEY && SCHEMA_REGISTRY_API_SECRET
+        ? { username: SCHEMA_REGISTRY_API_KEY, password: SCHEMA_REGISTRY_API_SECRET }
+        : undefined
+    })
+  : null;
+
 console.log(
   `[api] kafka disabled=${KAFKA_DISABLED} bootstrap=${process.env.CONFLUENT_BOOTSTRAP_SERVERS ? "set" : "missing"}`
 );
@@ -174,7 +195,67 @@ const parsePayload = (raw: unknown): Record<string, any> => {
   return {};
 };
 
-const parseMessageValue = (value: Buffer) => {
+const parseMessageValue = async (value: Buffer, topic?: string) => {
+  const schemaId =
+    value.length > 5 && value[0] === 0x00 ? value.readUInt32BE(1) : null;
+
+  if (topic === "kpis.rollup") {
+    const raw = value.length > 5 && value[0] === 0x00 ? value.subarray(5) : value;
+    try {
+      return JSON.parse(raw.toString());
+    } catch {
+      const text = raw.toString();
+      const jsonStart = text.search(/[{\[]/);
+      if (jsonStart >= 0) {
+        return JSON.parse(text.substring(jsonStart));
+      }
+      return text;
+    }
+  }
+
+  if (schemaRegistry && schemaId !== null) {
+    try {
+      const decoded = await schemaRegistry.decode(value);
+      if (process.env.DEBUG_ANOMALIES === "true" && topic === "insights.anomalies") {
+        const keys = decoded && typeof decoded === "object"
+          ? Object.keys(decoded as Record<string, any>).slice(0, 20)
+          : [];
+        console.log(`[anomaly-decoded] schemaId=${schemaId} type=${typeof decoded} keys=${keys.join(",")}`);
+      }
+      return decoded;
+    } catch (error) {
+      if (process.env.DEBUG_ANOMALIES === "true") {
+        console.log(
+          `[schema-registry] decode failed schemaId=${schemaId} err=${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+      try {
+        const schemaInfo = await schemaRegistry.getSchema(schemaId);
+        const schemaType = (schemaInfo as any)?.type || (schemaInfo as any)?.schemaType;
+        if (process.env.DEBUG_ANOMALIES === "true") {
+          console.log(`[schema-registry] schemaId=${schemaId} type=${schemaType ?? "unknown"}`);
+        }
+        if (schemaType === "JSON") {
+          const jsonText = value.subarray(5).toString();
+          try {
+            return JSON.parse(jsonText);
+          } catch {
+            const jsonStart = jsonText.search(/[{\[]/);
+            if (jsonStart >= 0) {
+              return JSON.parse(jsonText.substring(jsonStart));
+            }
+          }
+        }
+      } catch (fallbackError) {
+        if (process.env.DEBUG_ANOMALIES === "true") {
+          console.log(
+            `[schema-registry] fallback failed schemaId=${schemaId} err=${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`
+          );
+        }
+      }
+    }
+  }
+
   let buf = value;
   // Strip Confluent Schema Registry wire-format header (magic byte 0x00 + 4-byte schema ID)
   if (buf.length > 5 && buf[0] === 0x00) {
@@ -193,6 +274,9 @@ const parseMessageValue = (value: Buffer) => {
       } catch {
         // fall through
       }
+    }
+    if (process.env.DEBUG_ANOMALIES === "true" && topic === "insights.anomalies") {
+      console.log(`[anomaly-decoded] fallback type=${typeof text}`);
     }
     return text;
   }
@@ -237,6 +321,9 @@ app.get("/api/stream", (req, res) => {
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
   clients.push(res);
+  if (process.env.DEBUG_ANOMALIES === "true") {
+    console.log(`[sse] client connected count=${clients.length}`);
+  }
   res.write(
     `data: ${JSON.stringify({
       kpis,
@@ -255,6 +342,9 @@ app.get("/api/stream", (req, res) => {
   req.on("close", () => {
     const index = clients.indexOf(res);
     if (index >= 0) clients.splice(index, 1);
+    if (process.env.DEBUG_ANOMALIES === "true") {
+      console.log(`[sse] client disconnected count=${clients.length}`);
+    }
   });
 });
 
@@ -414,6 +504,7 @@ if (KAFKA_DISABLED) {
     await consumer.subscribe({ topic: "alerts.acks", fromBeginning });
 
     const agentTopicCounts: Record<string, number> = {};
+    let anomalyCount = 0;
     setInterval(() => {
       const agentTopics = ["ai.agent.decisions", "ai.agent.machine_health", "ai.agent.quality", "ai.agent.supply"];
       const summary = agentTopics.map(t => `${t}=${agentTopicCounts[t] ?? 0}`).join("  ");
@@ -437,7 +528,22 @@ if (KAFKA_DISABLED) {
             }
           }
 
-          const parsed = parseMessageValue(message.value);
+          if (topic === "insights.anomalies") {
+            anomalyCount += 1;
+            if (process.env.DEBUG_ANOMALIES === "true") {
+              const msgTimestamp = message.timestamp
+                ? new Date(Number(message.timestamp)).toISOString()
+                : "no-ts";
+              console.log(`[anomaly-rx] count=${anomalyCount} offset=${message.offset} produced=${msgTimestamp} size=${message.value.length}b`);
+              if (anomalyCount <= 3) {
+                const rawStr = message.value.toString().substring(0, 500);
+                console.log(`[anomaly-raw] first bytes: [${message.value[0]}, ${message.value[1]}, ${message.value[2]}, ${message.value[3]}, ${message.value[4]}]`);
+                console.log(`[anomaly-raw] text: ${rawStr}`);
+              }
+            }
+          }
+
+          const parsed = await parseMessageValue(message.value, topic);
           if (!parsed || typeof parsed !== "object") {
             if (topic.startsWith("ai.agent.")) {
               console.log(`[agent-parse-fail] ${topic} parseMessageValue returned type=${typeof parsed} value=${JSON.stringify(parsed).substring(0, 300)}`);
@@ -445,12 +551,23 @@ if (KAFKA_DISABLED) {
               const rawText = message.value.toString();
               console.log(`[agent-parse-fail] ${topic} raw text: ${rawText.substring(0, 400)}`);
             }
+            if (topic === "insights.anomalies" && process.env.DEBUG_ANOMALIES === "true") {
+              const schemaId =
+                message.value.length > 5 && message.value[0] === 0x00
+                  ? message.value.readUInt32BE(1)
+                  : null;
+              const rawText = message.value.toString();
+              console.log(`[anomaly-parse-fail] schemaId=${schemaId ?? "n/a"}`);
+              console.log(`[anomaly-parse-fail] type=${typeof parsed} value=${JSON.stringify(parsed).substring(0, 300)}`);
+              console.log(`[anomaly-parse-fail] raw text: ${rawText.substring(0, 400)}`);
+            }
             return;
           }
           const payload = parsed as Record<string, any>;
-
-          if (topic === "kpis.rollup" || topic === "insights.anomalies" || topic.startsWith("telemetry.") || topic.startsWith("events.")) {
-            console.log(`[stream-rx] ${topic} | offset=${message.offset} | keys=${Object.keys(payload).join(",")}`);
+          if (topic === "insights.anomalies" && process.env.DEBUG_ANOMALIES === "true") {
+            if (!("id" in payload) && !("summary" in payload)) {
+              console.log(`[anomaly-payload] keys=${Object.keys(payload).slice(0, 20).join(",")}`);
+            }
           }
 
           if (topic === "kpis.rollup") {
@@ -488,6 +605,9 @@ if (KAFKA_DISABLED) {
               },
               ...anomalies
             ].slice(0, 50);
+            if (process.env.DEBUG_ANOMALIES === "true") {
+              console.log(`[anomaly-state] anomalies=${anomalies.length} clients=${clients.length}`);
+            }
             // agent_insights from anomalies are static Flink-generated labels — don't overwrite
             // the real AI agent outputs stored in `agents`
           }
