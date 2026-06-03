@@ -22,7 +22,7 @@ SELECT
   END AS severity,
   CONCAT('Robot ', machine_id, ' anomaly: vibration ', CAST(vibration_hz AS STRING),
          ' Hz, defect rate ', CAST(defect_rate AS STRING)) AS summary,
-  CAST(ts AS STRING) AS ts
+  ts
 FROM `telemetry.robot`
 WHERE vibration_hz > 17 OR defect_rate > 0.02;
 
@@ -45,7 +45,7 @@ SELECT
   END AS severity,
   CONCAT('Quality alert: defect rate ', CAST(defect_rate AS STRING),
          ' for batch ', batch_id) AS summary,
-  CAST(ts AS STRING) AS ts
+  ts
 FROM `telemetry.quality`
 WHERE defect_rate > 0.02;
 
@@ -66,7 +66,7 @@ SELECT
     ELSE 'LOW'
   END AS severity,
   CONCAT('Maintenance event: ', action, ' by ', technician) AS summary,
-  CAST(ts AS STRING) AS ts
+  ts
 FROM `events.maintenance`;
 
 INSERT INTO `insights.anomalies` (
@@ -86,7 +86,7 @@ SELECT
     ELSE 'LOW'
   END AS severity,
   CONCAT('Supply delay ', CAST(delay_hours AS STRING), 'h for ', material) AS summary,
-  CAST(ts AS STRING) AS ts
+  ts
 FROM `events.supply`
 WHERE delay_hours > 1;
 
@@ -108,7 +108,7 @@ SELECT
   END AS severity,
   CONCAT('Inventory alert: stock ', CAST(stock_level AS STRING),
          ' for ', part_id) AS summary,
-  CAST(ts AS STRING) AS ts
+  ts
 FROM `telemetry.inventory`
 WHERE stock_level < 120;
 
@@ -129,7 +129,7 @@ SELECT
   CAST(CASE WHEN vibration_hz > 20 THEN 75 ELSE 25 END AS DOUBLE) AS downtime_risk,
   CAST(90 - (defect_rate * 100) AS DOUBLE) AS supply_health,
   CAST(420 + (vibration_hz * 2) AS DOUBLE) AS throughput,
-  CAST(ts AS STRING) AS updated_at,
+  ts AS updated_at,
   CAST(80 - (defect_rate * 100) AS DOUBLE) AS utilization
 FROM `telemetry.robot`;
 
@@ -144,7 +144,7 @@ SELECT
   CAST(0.0 AS DOUBLE) AS downtime_risk,
   CAST(0.0 AS DOUBLE) AS supply_health,
   CAST(0.0 AS DOUBLE) AS throughput,
-  CAST(ts AS STRING) AS updated_at,
+  ts AS updated_at,
   CAST(0.0 AS DOUBLE) AS utilization
 FROM `telemetry.quality`;
 
@@ -163,7 +163,7 @@ SELECT
   END AS DOUBLE) AS downtime_risk,
   CAST(0.0 AS DOUBLE) AS supply_health,
   CAST(0.0 AS DOUBLE) AS throughput,
-  CAST(ts AS STRING) AS updated_at,
+  ts AS updated_at,
   CAST(0.0 AS DOUBLE) AS utilization
 FROM `events.maintenance`;
 
@@ -182,7 +182,7 @@ SELECT
     ELSE 90
   END AS DOUBLE) AS supply_health,
   CAST(0.0 AS DOUBLE) AS throughput,
-  CAST(ts AS STRING) AS updated_at,
+  ts AS updated_at,
   CAST(0.0 AS DOUBLE) AS utilization
 FROM `events.supply`;
 
@@ -201,7 +201,7 @@ SELECT
     ELSE 95
   END AS DOUBLE) AS supply_health,
   CAST(0.0 AS DOUBLE) AS throughput,
-  CAST(ts AS STRING) AS updated_at,
+  ts AS updated_at,
   CAST(0.0 AS DOUBLE) AS utilization
 FROM `telemetry.inventory`;
 

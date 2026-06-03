@@ -1,4 +1,4 @@
-CREATE TABLE telemetry_robot (
+CREATE TABLE `telemetry.robot` (
   machine_id STRING,
   line_id STRING,
   ts TIMESTAMP_LTZ(3),
@@ -19,7 +19,7 @@ CREATE TABLE telemetry_robot (
   'scan.startup.mode' = 'latest-offset'
 );
 
-CREATE TABLE telemetry_quality (
+CREATE TABLE `telemetry.quality` (
   line_id STRING,
   ts TIMESTAMP_LTZ(3),
   batch_id STRING,
@@ -36,7 +36,7 @@ CREATE TABLE telemetry_quality (
   'scan.startup.mode' = 'latest-offset'
 );
 
-CREATE TABLE telemetry_inventory (
+CREATE TABLE `telemetry.inventory` (
   part_id STRING,
   ts TIMESTAMP_LTZ(3),
   stock_level INT,
@@ -53,7 +53,7 @@ CREATE TABLE telemetry_inventory (
   'scan.startup.mode' = 'latest-offset'
 );
 
-CREATE TABLE events_maintenance (
+CREATE TABLE `events.maintenance` (
   machine_id STRING,
   ts TIMESTAMP_LTZ(3),
   action STRING,
@@ -70,7 +70,7 @@ CREATE TABLE events_maintenance (
   'scan.startup.mode' = 'latest-offset'
 );
 
-CREATE TABLE events_supply (
+CREATE TABLE `events.supply` (
   supplier_id STRING,
   ts TIMESTAMP_LTZ(3),
   delay_hours DOUBLE,
@@ -87,7 +87,8 @@ CREATE TABLE events_supply (
   'scan.startup.mode' = 'latest-offset'
 );
 
-CREATE TABLE insights_anomalies (
+CREATE TABLE `insights.anomalies` (
+  `key` BYTES,
   id STRING,
   machine_id STRING,
   line_id STRING,
@@ -107,8 +108,9 @@ CREATE TABLE insights_anomalies (
   'scan.startup.mode' = 'latest-offset'
 );
 
-CREATE TABLE kpis_rollup (
-  active_alerts INT,
+CREATE TABLE `kpis.rollup` (
+  `key` BYTES,
+  active_alerts BIGINT,
   downtime_risk DOUBLE,
   throughput DOUBLE,
   defect_probability DOUBLE,
