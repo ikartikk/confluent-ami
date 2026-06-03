@@ -413,6 +413,13 @@ if (KAFKA_DISABLED) {
     await consumer.subscribe({ topic: "ai.agent.supply", fromBeginning });
     await consumer.subscribe({ topic: "alerts.acks", fromBeginning });
 
+    const pushAnomaly = (event: AnomalyEvent) => {
+      const isDupe = anomalies.some((a) => a.id === event.id);
+      if (!isDupe) {
+        anomalies = [event, ...anomalies].slice(0, 50);
+      }
+    };
+
     const agentTopicCounts: Record<string, number> = {};
     setInterval(() => {
       const agentTopics = ["ai.agent.decisions", "ai.agent.machine_health", "ai.agent.quality", "ai.agent.supply"];
@@ -491,6 +498,20 @@ if (KAFKA_DISABLED) {
               status: payload.status ?? "LOW"
             };
             machines = [machine, ...machines.filter((m) => m.machineId !== machine.machineId)].slice(0, 12);
+            if (payload.vibration_hz > 17 || payload.defect_rate > 0.02) {
+              const severity =
+                payload.vibration_hz > 22 || payload.defect_rate > 0.06 ? "CRITICAL" :
+                payload.vibration_hz > 20 || payload.defect_rate > 0.04 ? "HIGH" :
+                payload.vibration_hz > 18 || payload.defect_rate > 0.03 ? "MEDIUM" : "LOW";
+              pushAnomaly({
+                id: `${payload.machine_id}-${payload.ts ?? Date.now()}`,
+                severity: severity as AnomalyEvent["severity"],
+                machineId: payload.machine_id ?? "RB-00",
+                lineId: payload.line_id ?? "Line-A",
+                summary: `Robot ${payload.machine_id} anomaly: vibration ${payload.vibration_hz} Hz, defect rate ${payload.defect_rate}`,
+                timestamp: payload.ts ?? new Date().toISOString()
+              });
+            }
           }
           if (topic === "telemetry.quality") {
             const entry: QualityTelemetry = {
@@ -500,6 +521,20 @@ if (KAFKA_DISABLED) {
               defectRate: payload.defect_rate
             };
             qualityTelemetry = [entry, ...qualityTelemetry].slice(0, 30);
+            if (payload.defect_rate > 0.02) {
+              const severity =
+                payload.defect_rate > 0.06 ? "CRITICAL" :
+                payload.defect_rate > 0.04 ? "HIGH" :
+                payload.defect_rate > 0.03 ? "MEDIUM" : "LOW";
+              pushAnomaly({
+                id: `quality-${payload.line_id}-${payload.ts ?? Date.now()}`,
+                severity: severity as AnomalyEvent["severity"],
+                machineId: `LINE-${payload.line_id}`,
+                lineId: payload.line_id ?? "Line-A",
+                summary: `Quality alert: defect rate ${payload.defect_rate} for batch ${payload.batch_id}`,
+                timestamp: payload.ts ?? new Date().toISOString()
+              });
+            }
           }
           if (topic === "telemetry.inventory") {
             const entry: InventoryTelemetry = {
@@ -509,6 +544,19 @@ if (KAFKA_DISABLED) {
               consumptionRate: payload.consumption_rate
             };
             inventoryTelemetry = [entry, ...inventoryTelemetry].slice(0, 30);
+            if (payload.stock_level < 120) {
+              const severity =
+                payload.stock_level < 60 ? "HIGH" :
+                payload.stock_level < 100 ? "MEDIUM" : "LOW";
+              pushAnomaly({
+                id: `inventory-${payload.part_id}-${payload.ts ?? Date.now()}`,
+                severity: severity as AnomalyEvent["severity"],
+                machineId: payload.part_id,
+                lineId: "UNKNOWN",
+                summary: `Inventory alert: stock ${payload.stock_level} for ${payload.part_id}`,
+                timestamp: payload.ts ?? new Date().toISOString()
+              });
+            }
           }
           if (topic === "events.maintenance") {
             const entry: MaintenanceEvent = {
@@ -518,6 +566,17 @@ if (KAFKA_DISABLED) {
               technician: payload.technician
             };
             maintenanceEvents = [entry, ...maintenanceEvents].slice(0, 30);
+            const severity =
+              payload.action === "replace-bearing" ? "HIGH" :
+              payload.action === "lubricate" ? "MEDIUM" : "LOW";
+            pushAnomaly({
+              id: `maintenance-${payload.machine_id}-${payload.ts ?? Date.now()}`,
+              severity: severity as AnomalyEvent["severity"],
+              machineId: payload.machine_id,
+              lineId: "UNKNOWN",
+              summary: `Maintenance event: ${payload.action} by ${payload.technician}`,
+              timestamp: payload.ts ?? new Date().toISOString()
+            });
           }
           if (topic === "events.supply") {
             const entry: SupplyEvent = {
@@ -527,6 +586,19 @@ if (KAFKA_DISABLED) {
               material: payload.material
             };
             supplyEvents = [entry, ...supplyEvents].slice(0, 30);
+            if (payload.delay_hours > 1) {
+              const severity =
+                payload.delay_hours > 4 ? "HIGH" :
+                payload.delay_hours > 2 ? "MEDIUM" : "LOW";
+              pushAnomaly({
+                id: `supply-${payload.supplier_id}-${payload.ts ?? Date.now()}`,
+                severity: severity as AnomalyEvent["severity"],
+                machineId: payload.supplier_id,
+                lineId: "UNKNOWN",
+                summary: `Supply delay ${payload.delay_hours}h for ${payload.material}`,
+                timestamp: payload.ts ?? new Date().toISOString()
+              });
+            }
           }
           if (topic === "ai.agent.decisions") {
             console.log(`[agent] ${topic} raw payload keys:`, Object.keys(payload));
