@@ -1,0 +1,15 @@
+{
+  "title": "telemetry.robot",
+  "type": "object",
+  "properties": {
+    "machine_id": { "type": "string" },
+    "line_id": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "vibration_hz": { "type": "number" },
+    "torque_nm": { "type": "number" },
+    "temperature_c": { "type": "number" },
+    "defect_rate": { "type": "number" },
+    "status": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] }
+  },
+  "required": ["machine_id", "line_id", "ts", "vibration_hz", "torque_nm", "temperature_c", "defect_rate"]
+}

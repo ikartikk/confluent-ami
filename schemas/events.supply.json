@@ -1,0 +1,11 @@
+{
+  "title": "events.supply",
+  "type": "object",
+  "properties": {
+    "supplier_id": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "delay_hours": { "type": "number" },
+    "material": { "type": "string" }
+  },
+  "required": ["supplier_id", "ts", "delay_hours", "material"]
+}

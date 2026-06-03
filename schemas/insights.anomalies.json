@@ -1,0 +1,23 @@
+{
+  "title": "insights.anomalies",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "machine_id": { "type": "string" },
+    "line_id": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "severity": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+    "summary": { "type": "string" },
+    "agent_insights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "agent": { "type": "string" },
+          "summary": { "type": "string" }
+        }
+      }
+    }
+  },
+  "required": ["id", "machine_id", "line_id", "ts", "severity", "summary"]
+}

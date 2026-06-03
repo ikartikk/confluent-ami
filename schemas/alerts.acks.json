@@ -1,0 +1,10 @@
+{
+  "title": "alerts.acks",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "acknowledgedBy": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" }
+  },
+  "required": ["id", "acknowledgedBy", "timestamp"]
+}

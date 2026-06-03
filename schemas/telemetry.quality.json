@@ -1,0 +1,11 @@
+{
+  "title": "telemetry.quality",
+  "type": "object",
+  "properties": {
+    "line_id": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "batch_id": { "type": "string" },
+    "defect_rate": { "type": "number" }
+  },
+  "required": ["line_id", "ts", "batch_id", "defect_rate"]
+}

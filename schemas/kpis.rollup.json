@@ -1,0 +1,14 @@
+{
+  "title": "kpis.rollup",
+  "type": "object",
+  "properties": {
+    "active_alerts": { "type": "integer" },
+    "downtime_risk": { "type": "number" },
+    "throughput": { "type": "number" },
+    "defect_probability": { "type": "number" },
+    "supply_health": { "type": "number" },
+    "utilization": { "type": "number" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["active_alerts", "downtime_risk", "throughput", "defect_probability", "supply_health", "utilization"]
+}

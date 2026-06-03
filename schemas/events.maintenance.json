@@ -1,0 +1,11 @@
+{
+  "title": "events.maintenance",
+  "type": "object",
+  "properties": {
+    "machine_id": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "action": { "type": "string" },
+    "technician": { "type": "string" }
+  },
+  "required": ["machine_id", "ts", "action"]
+}

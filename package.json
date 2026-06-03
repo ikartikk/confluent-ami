@@ -1,0 +1,13 @@
+{
+  "name": "autonomous-manufacturing-intelligence",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "simulator"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "dev:api": "npm --workspace apps/api run dev",
+    "dev:sim": "npm --workspace simulator run dev"
+  }
+}

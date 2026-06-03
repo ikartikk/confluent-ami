@@ -1,0 +1,11 @@
+{
+  "title": "telemetry.inventory",
+  "type": "object",
+  "properties": {
+    "part_id": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "stock_level": { "type": "integer" },
+    "consumption_rate": { "type": "number" }
+  },
+  "required": ["part_id", "ts", "stock_level", "consumption_rate"]
+}

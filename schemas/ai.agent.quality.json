@@ -1,0 +1,8 @@
+{
+  "title": "ai.agent.quality",
+  "type": "object",
+  "properties": {
+    "payload": { "type": "string" }
+  },
+  "required": ["payload"]
+}

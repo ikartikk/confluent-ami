@@ -1,0 +1,8 @@
+{
+  "title": "ai.agent.machine_health",
+  "type": "object",
+  "properties": {
+    "payload": { "type": "string" }
+  },
+  "required": ["payload"]
+}

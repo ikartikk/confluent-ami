@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5f5 transparent;
+}
+
+/* Smooth sliding-window transitions for recharts SVG paths */
+.chart-smooth path,
+.chart-smooth .recharts-area-area,
+.chart-smooth .recharts-area-curve {
+  transition: d 800ms ease-in-out;
+}
+.chart-smooth .recharts-cartesian-grid-horizontal line,
+.chart-smooth .recharts-cartesian-grid-vertical line {
+  transition: none;
+}
+.sparkline-smooth path,
+.sparkline-smooth .recharts-area-area,
+.sparkline-smooth .recharts-area-curve {
+  transition: d 800ms ease-in-out;
+}
