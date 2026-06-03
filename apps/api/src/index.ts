@@ -261,7 +261,10 @@ app.get("/api/stream", (req, res) => {
 app.get("/api/kpis", (_req, res) => {
   res.json({
     kpis,
+    anomalies,
+    agents,
     machines,
+    agentDecisions,
     acks: Object.values(acks),
     qualityTelemetry,
     inventoryTelemetry,

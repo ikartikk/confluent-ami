@@ -5,7 +5,7 @@ import KpiCard from "@/components/KpiCard";
 import EventFeed from "@/components/EventFeed";
 import AgentPanel from "@/components/AgentPanel";
 import ChartCard from "@/components/ChartCard";
-import { useStream } from "@/lib/useStream";
+import { useStream } from "@/lib/StreamProvider";
 import type { KpiSnapshot } from "@/lib/types";
 import { useEffect, useState } from "react";
 

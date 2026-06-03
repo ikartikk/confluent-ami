@@ -3,7 +3,7 @@
 import TopNav from "@/components/TopNav";
 import MachineCard from "@/components/MachineCard";
 import GenericListCard from "@/components/GenericListCard";
-import { useStream } from "@/lib/useStream";
+import { useStream } from "@/lib/StreamProvider";
 
 export default function AssetsPage() {
   const stream = useStream();

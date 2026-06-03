@@ -2,7 +2,7 @@
 
 import TopNav from "@/components/TopNav";
 import AlertsTable from "@/components/AlertsTable";
-import { useStream } from "@/lib/useStream";
+import { useStream } from "@/lib/StreamProvider";
 
 export default function AlertsPage() {
   const stream = useStream();

@@ -111,7 +111,7 @@ export default function AgentPanel({ insights }: { insights: AgentInsight[] }) {
   );
 
   return (
-    <div className="rounded-2xl border border-panel-border bg-panel p-4 shadow-sm">
+    <div className="rounded-2xl border border-panel-border bg-panel p-4 shadow-sm flex flex-col max-h-[560px]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10">
@@ -128,7 +128,7 @@ export default function AgentPanel({ insights }: { insights: AgentInsight[] }) {
         </span>
       </div>
 
-      <div className="mt-3 max-h-[480px] space-y-2 overflow-y-auto pr-1">
+      <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
         {insights.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-6 text-muted">
             <svg className="h-6 w-6 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
