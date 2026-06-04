@@ -6,10 +6,10 @@ Production-grade architecture that streams simulated manufacturing telemetry int
 
 ```mermaid
 flowchart LR
-  SIM[Python Simulator] -->|telemetry.robot<br/>telemetry.quality<br/>telemetry.inventory<br/>events.maintenance<br/>events.supply| KAFKA[(Confluent Cloud Kafka)]
-  KAFKA --> FLINK[Confluent Cloud Flink SQL<br/>Topic-bound Tables]
+  SIM[Confluent Producer] -->|telemetry.robot<br/>telemetry.quality<br/>telemetry.inventory<br/>events.maintenance<br/>events.supply| KAFKA[(Confluent Cloud Kafka)]
+  KAFKA --> FLINK[Confluent Cloud Flink SQL<br/>Topic-bound Tables<br/>AI model inference]
   FLINK -->|insights.anomalies<br/>kpis.rollup<br/>ai.agent.*| KAFKA
-  KAFKA --> API[Local Node API<br/>Kafka consumer + SSE]
+  KAFKA --> API[Kafka consumer + SSE]
   API --> WEB[Next.js Ops Dashboard]
   SCHEMA[(Confluent Schema Service)] --- KAFKA
 ```
@@ -60,4 +60,3 @@ npm run dev:sim
 
 - Schemas live in `schemas/` for topic contract governance.
 - AI agent outputs are published to `ai.agent.*` topics by Flink AI/Streaming Agents (`AI_RUN_AGENT`).
-
