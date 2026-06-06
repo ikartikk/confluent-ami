@@ -579,8 +579,15 @@ app.post("/api/chat", async (req, res) => {
       data?.choices?.[0]?.message?.content?.trim() || "(no answer returned)";
     res.json({ answer });
   } catch (err) {
+    const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+    const cause =
+      err instanceof Error && (err as any).cause
+        ? ` | cause: ${String((err as any).cause?.code || (err as any).cause?.message || (err as any).cause)}`
+        : "";
     console.error("[chat] request failed:", err);
-    res.status(502).json({ error: "assistant request failed" });
+    res
+      .status(502)
+      .json({ error: "assistant request failed", detail: `${detail}${cause}` });
   }
 });
 
