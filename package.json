@@ -3,11 +3,13 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "simulator"
+    "simulator",
+    "tools/probe"
   ],
   "scripts": {
     "dev:web": "npm --workspace apps/web run dev",
     "dev:api": "npm --workspace apps/api run dev",
-    "dev:sim": "npm --workspace simulator run dev"
+    "dev:sim": "npm --workspace simulator run dev",
+    "probe": "npm --workspace tools/probe run start --"
   }
 }

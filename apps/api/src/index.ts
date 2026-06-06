@@ -172,6 +172,33 @@ let maintenanceEvents: MaintenanceEvent[] = [];
 let supplyEvents: SupplyEvent[] = [];
 let producer: ReturnType<Kafka["producer"]> | null = null;
 
+// --- Health / observability state -------------------------------------------
+// Tracked from inside the existing consumer loop (no extra connections).
+const startedAt = Date.now();
+let kafkaConnected = false;
+type TopicStat = {
+  count: number;
+  lastReceivedAt: number; // ms epoch when the API processed the message
+  lastProducedAt: number; // ms epoch from message.timestamp (broker/producer)
+};
+const topicStats: Record<string, TopicStat> = {};
+// Topics we expect to flow continuously; flagged stale if silent too long.
+const HIGH_FREQ_TOPICS = new Set([
+  "telemetry.robot",
+  "telemetry.quality",
+  "telemetry.inventory"
+]);
+const STALE_THRESHOLD_MS = 10000;
+
+const recordTopicMessage = (topic: string, producedAt: number) => {
+  const prev = topicStats[topic];
+  topicStats[topic] = {
+    count: (prev?.count ?? 0) + 1,
+    lastReceivedAt: Date.now(),
+    lastProducedAt: producedAt
+  };
+};
+
 const parsePayload = (raw: unknown): Record<string, any> => {
   if (typeof raw === "string") {
     try {
@@ -379,6 +406,44 @@ app.get("/api/agent-debug", (_req, res) => {
   });
 });
 
+app.get("/health", (_req, res) => {
+  const now = Date.now();
+  const topics: Record<
+    string,
+    { count: number; lastReceivedAgoMs: number; lastLagMs: number; stale: boolean }
+  > = {};
+  let anyStale = false;
+  for (const [topic, stat] of Object.entries(topicStats)) {
+    const lastReceivedAgoMs = now - stat.lastReceivedAt;
+    const stale =
+      HIGH_FREQ_TOPICS.has(topic) && lastReceivedAgoMs > STALE_THRESHOLD_MS;
+    if (stale) anyStale = true;
+    topics[topic] = {
+      count: stat.count,
+      lastReceivedAgoMs,
+      // produce→consume delay for the most recent message on this topic
+      lastLagMs:
+        stat.lastProducedAt > 0 ? stat.lastReceivedAt - stat.lastProducedAt : -1,
+      stale
+    };
+  }
+
+  const status = KAFKA_DISABLED
+    ? "ok"
+    : !kafkaConnected || anyStale
+    ? "degraded"
+    : "ok";
+
+  res.status(status === "ok" ? 200 : 503).json({
+    status,
+    kafkaDisabled: KAFKA_DISABLED,
+    kafkaConnected: KAFKA_DISABLED ? false : kafkaConnected,
+    uptimeSeconds: Math.round((now - startedAt) / 1000),
+    sseClients: clients.length,
+    topics
+  });
+});
+
 app.post("/api/ack", async (req, res) => {
   const id = req.body?.id as string;
   const acknowledgedBy = (req.body?.acknowledgedBy as string) || "operator";
@@ -494,6 +559,7 @@ if (KAFKA_DISABLED) {
   const run = async () => {
     await consumer.connect();
     await producer.connect();
+    kafkaConnected = true;
     await consumer.subscribe({ topic: "insights.anomalies", fromBeginning });
     await consumer.subscribe({ topic: "kpis.rollup", fromBeginning });
     await consumer.subscribe({ topic: "telemetry.robot", fromBeginning });
@@ -519,6 +585,8 @@ if (KAFKA_DISABLED) {
       eachMessage: async ({ topic, message }) => {
         try {
           if (!message.value) return;
+
+          recordTopicMessage(topic, message.timestamp ? Number(message.timestamp) : 0);
 
           if (topic.startsWith("ai.agent.")) {
             agentTopicCounts[topic] = (agentTopicCounts[topic] ?? 0) + 1;
@@ -715,6 +783,7 @@ if (KAFKA_DISABLED) {
   };
 
   run().catch((err) => {
+    kafkaConnected = false;
     console.error("Kafka consumer error", err);
   });
 }
