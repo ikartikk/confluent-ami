@@ -1,5 +1,11 @@
 export type Severity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
 
+export type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  error?: boolean;
+};
+
 export type KpiSnapshot = {
   activeAlerts: number;
   downtimeRisk: number;

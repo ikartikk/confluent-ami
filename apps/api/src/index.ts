@@ -406,6 +406,184 @@ app.get("/api/agent-debug", (_req, res) => {
   });
 });
 
+// --- Chatbot: grounded on the live Confluent-sourced state ------------------
+// The API already materializes every topic into the module state above; the
+// chatbot reads ONLY from that state (never the simulator), so it behaves the
+// same whether data comes from the simulator or real sensors.
+
+const AZURE_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT || "";
+const AZURE_KEY =
+  process.env.AZURE_OPENAI_AI_KEY || process.env.AZURE_OPENAI_API_KEY || "";
+const AZURE_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || "";
+const AZURE_API_VERSION = process.env.AZURE_OPENAI_API_VERSION || "2025-01-01-preview";
+
+// Resolve a full chat-completions URL whether the env holds the full URL or just the base.
+const resolveAzureUrl = (): string => {
+  if (!AZURE_ENDPOINT) return "";
+  if (AZURE_ENDPOINT.includes("/chat/completions")) return AZURE_ENDPOINT;
+  const base = AZURE_ENDPOINT.replace(/\/+$/, "");
+  return `${base}/openai/deployments/${AZURE_DEPLOYMENT}/chat/completions?api-version=${AZURE_API_VERSION}`;
+};
+
+const num = (n: number | undefined | null, digits = 2): string =>
+  typeof n === "number" && Number.isFinite(n) ? n.toFixed(digits) : "n/a";
+
+// Build a compact, bounded snapshot of current factory state for grounding.
+const buildContext = (): string => {
+  const ackedIds = new Set(Object.keys(acks));
+  const openAnomalies = anomalies.filter((a) => !ackedIds.has(a.id)).slice(0, 15);
+
+  const machineLines = machines.length
+    ? machines
+        .map(
+          (m) =>
+            `  ${m.machineId} (line ${m.lineId}): status=${m.status} vibration=${num(
+              m.vibrationHz
+            )}Hz torque=${num(m.torqueNm)}Nm temp=${num(m.temperatureC)}C defectRate=${num(
+              m.defectRate,
+              4
+            )} @${m.lastUpdated}`
+        )
+        .join("\n")
+    : "  (no machine telemetry yet)";
+
+  const anomalyLines = openAnomalies.length
+    ? openAnomalies
+        .map(
+          (a) =>
+            `  [${a.severity}] ${a.machineId} (line ${a.lineId}): ${a.summary} @${a.timestamp}`
+        )
+        .join("\n")
+    : "  (no open anomalies)";
+
+  const agentLines = agentOutputs.slice(0, 6).length
+    ? agentOutputs
+        .slice(0, 6)
+        .map((a) => `  ${a.agent}: ${a.summary}`)
+        .join("\n")
+    : "  (no agent insights yet)";
+
+  const supplyLines = supplyEvents.slice(0, 6).length
+    ? supplyEvents
+        .slice(0, 6)
+        .map(
+          (s) =>
+            `  ${s.supplierId}: ${s.material} delay=${num(s.delayHours)}h @${s.timestamp}`
+        )
+        .join("\n")
+    : "  (no recent supply events)";
+
+  const inventoryLines = inventoryTelemetry.slice(0, 8).length
+    ? inventoryTelemetry
+        .slice(0, 8)
+        .map(
+          (i) =>
+            `  ${i.partId}: stock=${i.stockLevel} consumption=${num(i.consumptionRate)} @${i.timestamp}`
+        )
+        .join("\n")
+    : "  (no recent inventory telemetry)";
+
+  const maintLines = maintenanceEvents.slice(0, 6).length
+    ? maintenanceEvents
+        .slice(0, 6)
+        .map((m) => `  ${m.machineId}: ${m.action} by ${m.technician} @${m.timestamp}`)
+        .join("\n")
+    : "  (no recent maintenance events)";
+
+  return [
+    "=== CURRENT KPIs ===",
+    `  activeAlerts=${kpis.activeAlerts} downtimeRisk=${num(kpis.downtimeRisk)} throughput=${num(
+      kpis.throughput
+    )} defectProbability=${num(kpis.defectProbability)} supplyHealth=${num(
+      kpis.supplyHealth
+    )} utilization=${num(kpis.utilization)} (updated ${kpis.updatedAt})`,
+    "",
+    "=== MACHINES (latest reading each) ===",
+    machineLines,
+    "",
+    "=== OPEN ANOMALIES (unacknowledged) ===",
+    anomalyLines,
+    "",
+    "=== AI AGENT INSIGHTS ===",
+    agentLines,
+    "",
+    "=== RECENT SUPPLY EVENTS ===",
+    supplyLines,
+    "",
+    "=== RECENT INVENTORY TELEMETRY ===",
+    inventoryLines,
+    "",
+    "=== RECENT MAINTENANCE EVENTS ===",
+    maintLines
+  ].join("\n");
+};
+
+const CHAT_SYSTEM_PROMPT = [
+  "You are AMI, the assistant for an Autonomous Manufacturing Intelligence platform.",
+  "You answer questions about the live factory using ONLY the FACTORY STATE provided below,",
+  "which is materialized in real time from Confluent/Kafka topics.",
+  "Rules:",
+  "- Answer strictly from the provided state. Do NOT invent machines, readings, or events.",
+  "- If the state has no data for the entity asked about, say so plainly (e.g. 'No current reading for RB-99').",
+  "- Be concise and operational. Prefer concrete numbers and machine/line IDs.",
+  "- When you use a fact, cite the source entity (machine ID, line, supplier, or 'KPIs').",
+  "- For root-cause questions, reason across machines, anomalies, supply and maintenance in the state.",
+  "- If asked to take an action (ack/schedule), explain that actions are not yet wired and what you would do."
+].join("\n");
+
+type ChatTurn = { role: "user" | "assistant"; content: string };
+
+app.post("/api/chat", async (req, res) => {
+  const question = typeof req.body?.question === "string" ? req.body.question.trim() : "";
+  if (!question) return res.status(400).json({ error: "question required" });
+  const history: ChatTurn[] = Array.isArray(req.body?.history)
+    ? (req.body.history as any[])
+        .filter(
+          (h) =>
+            h &&
+            (h.role === "user" || h.role === "assistant") &&
+            typeof h.content === "string"
+        )
+        .slice(-8)
+        .map((h) => ({ role: h.role, content: String(h.content).slice(0, 2000) }))
+    : [];
+
+  const url = resolveAzureUrl();
+  if (!url || !AZURE_KEY) {
+    return res
+      .status(503)
+      .json({ error: "chat unavailable: Azure OpenAI not configured" });
+  }
+
+  const context = buildContext();
+  const messages = [
+    { role: "system", content: CHAT_SYSTEM_PROMPT },
+    { role: "system", content: `FACTORY STATE (live from Confluent):\n${context}` },
+    ...history,
+    { role: "user", content: question }
+  ];
+
+  try {
+    const azureRes = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "api-key": AZURE_KEY },
+      body: JSON.stringify({ messages, temperature: 0.2, max_tokens: 600 })
+    });
+    if (!azureRes.ok) {
+      const detail = await azureRes.text().catch(() => "");
+      console.error(`[chat] azure error ${azureRes.status}: ${detail.slice(0, 300)}`);
+      return res.status(502).json({ error: "assistant backend error" });
+    }
+    const data = (await azureRes.json()) as any;
+    const answer: string =
+      data?.choices?.[0]?.message?.content?.trim() || "(no answer returned)";
+    res.json({ answer });
+  } catch (err) {
+    console.error("[chat] request failed:", err);
+    res.status(502).json({ error: "assistant request failed" });
+  }
+});
+
 app.get("/health", (_req, res) => {
   const now = Date.now();
   const topics: Record<

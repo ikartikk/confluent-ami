@@ -1,5 +1,6 @@
 import Link from "next/link";
 import clsx from "clsx";
+import ChatPanel from "@/components/ChatPanel";
 
 const links = [
   { href: "/", label: "Dashboard" },
@@ -34,6 +35,7 @@ export default function TopNav({
         >
           {status[connection].label}
         </span>
+        <ChatPanel />
         <div className="flex gap-2 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-panel-border">
         {links.map((link) => (
           <Link
