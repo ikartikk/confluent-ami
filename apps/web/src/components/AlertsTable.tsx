@@ -55,7 +55,8 @@ export default function AlertsTable({
                 const ack = ackById.get(event.id);
                 const canAutoResolve = !ack && (event.severity === "LOW" || event.severity === "MEDIUM");
                 const needsHuman = !ack && (event.severity === "CRITICAL" || event.severity === "HIGH");
-                const isAutoResolved = ack?.acknowledgedBy === "ami-agent" || ack?.acknowledgedBy === "ami-flink";
+                const isFlinkResolved = ack?.acknowledgedBy === "ami-flink";
+                const isAutoResolved = ack?.acknowledgedBy === "ami-agent" || isFlinkResolved;
 
                 return (
                   <tr key={event.id} className="border-t border-panel-border">
@@ -67,7 +68,11 @@ export default function AlertsTable({
                     <td className="py-2">{event.summary}</td>
                     <td className="py-2">{new Date(event.timestamp).toLocaleTimeString()}</td>
                     <td className="py-2">
-                      {isAutoResolved ? (
+                      {isFlinkResolved ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-low/10 px-2 py-0.5 text-xs font-semibold text-low">
+                          ✦ Auto-resolved by Flink Agent
+                        </span>
+                      ) : isAutoResolved ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-low/10 px-2 py-0.5 text-xs font-semibold text-low">
                           ✦ Resolved by AMI
                         </span>

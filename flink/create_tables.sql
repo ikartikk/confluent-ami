@@ -179,12 +179,13 @@ CREATE TABLE `ai.agent.decisions` (
   'format' = 'json'
 );
 
--- Sink: acks written by Flink's autonomous resolution agent
+-- Sink: acks written by Flink's autonomous resolution agent.
+-- Field names match alerts.acks.json schema exactly so the API parses without changes.
 CREATE TABLE `alerts.acks` (
-  `key` BYTES,
-  id STRING,
-  acknowledged_by STRING,
-  timestamp_ms BIGINT
+  `key`            BYTES,
+  id               STRING,
+  acknowledgedBy   STRING,
+  `timestamp`      STRING
 ) WITH (
   'connector' = 'kafka',
   'topic' = 'alerts.acks',

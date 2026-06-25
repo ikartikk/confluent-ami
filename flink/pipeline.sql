@@ -274,28 +274,31 @@ LATERAL TABLE(
 -- LOW/MEDIUM anomalies only. AI decides YES (auto-resolve) or NO (escalate to human).
 -- On YES: writes to alerts.acks + actions.taken (full audit trail, no human needed).
 -- On NO:  writes to alerts.escalated (human approval required).
+-- Agent 5 writes to actions.taken (audit log) AND conditionally to alerts.acks.
+-- Two separate INSERTs: one always writes the audit record,
+-- the second only writes the ack when AI says DECISION: YES.
+
 INSERT INTO `actions.taken`
 SELECT
-  CAST(NULL AS BYTES) AS key,
-  id AS anomaly_id,
+  CAST(NULL AS BYTES)                                               AS key,
+  id                                                                AS anomaly_id,
   machine_id,
   severity,
   CASE
     WHEN agent_output.response LIKE '%DECISION: YES%' THEN 'auto-resolved'
     ELSE 'escalated-to-human'
-  END AS action,
-  agent_output.response AS reason,
-  'ami-flink' AS resolved_by,
-  ts
+  END                                                               AS action,
+  agent_output.response                                             AS reason,
+  'ami-flink'                                                       AS resolved_by,
+  CAST(ts AS STRING)                                                AS ts
 FROM `insights.anomalies` /*+ OPTIONS('scan.startup.mode'='latest-offset') */,
 LATERAL TABLE(
   AI_RUN_AGENT(
     'auto_resolve_agent',
     CONCAT(
       'Anomaly on machine ', machine_id, ' (', line_id, '). ',
-      'Severity: ', severity, '. ',
-      'Details: ', summary, '. ',
-      'Should this be auto-resolved by the system, or escalated to a human? ',
+      'Severity: ', severity, '. Details: ', summary, '. ',
+      'Should this be auto-resolved or escalated to a human? ',
       'Reply with exactly: DECISION: YES or DECISION: NO. Then one sentence reason.'
     ),
     id,
@@ -304,3 +307,29 @@ LATERAL TABLE(
   )
 ) AS agent_output(status, response)
 WHERE severity IN ('LOW', 'MEDIUM');
+
+-- When AI approves, write the ack directly into alerts.acks.
+-- The API reads this topic and surfaces "✦ Resolved by AMI" on the dashboard.
+INSERT INTO `alerts.acks`
+SELECT
+  CAST(NULL AS BYTES)         AS key,
+  id                          AS id,
+  'ami-flink'                 AS acknowledgedBy,
+  CAST(ts AS STRING)          AS `timestamp`
+FROM `insights.anomalies` /*+ OPTIONS('scan.startup.mode'='latest-offset') */,
+LATERAL TABLE(
+  AI_RUN_AGENT(
+    'auto_resolve_agent',
+    CONCAT(
+      'Anomaly on machine ', machine_id, ' (', line_id, '). ',
+      'Severity: ', severity, '. Details: ', summary, '. ',
+      'Should this be auto-resolved or escalated to a human? ',
+      'Reply with exactly: DECISION: YES or DECISION: NO. Then one sentence reason.'
+    ),
+    id,
+    'agent_system_table',
+    MAP['debug', 'false']
+  )
+) AS agent_output(status, response)
+WHERE severity IN ('LOW', 'MEDIUM')
+  AND agent_output.response LIKE '%DECISION: YES%';

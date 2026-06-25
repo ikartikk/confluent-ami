@@ -2,9 +2,9 @@
   "title": "alerts.acks",
   "type": "object",
   "properties": {
-    "id": { "type": "string" },
+    "id":             { "type": "string" },
     "acknowledgedBy": { "type": "string" },
-    "timestamp": { "type": "string", "format": "date-time" }
+    "timestamp":      { "type": "string", "format": "date-time" }
   },
   "required": ["id", "acknowledgedBy", "timestamp"]
 }

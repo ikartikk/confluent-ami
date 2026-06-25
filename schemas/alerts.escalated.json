@@ -1,0 +1,14 @@
+{
+  "title": "alerts.escalated",
+  "type": "object",
+  "properties": {
+    "anomaly_id":  { "type": "string", "description": "ID of the anomaly being escalated" },
+    "machine_id":  { "type": "string" },
+    "severity":    { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+    "summary":     { "type": "string", "description": "Original anomaly summary" },
+    "reason":      { "type": "string", "description": "Why the AI decided human review is required" },
+    "ts":          { "type": "string", "format": "date-time" }
+  },
+  "required": ["anomaly_id", "machine_id", "severity", "summary", "reason", "ts"],
+  "additionalProperties": false
+}
