@@ -83,6 +83,14 @@ export function StreamProvider({ children }: { children: ReactNode }) {
   const pendingPayloadRef = useRef<Record<string, any> | null>(null);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const historyTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const notifiedIdsRef = useRef<Set<string>>(new Set());
+
+  // Request browser notification permission once on mount.
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -188,6 +196,21 @@ export function StreamProvider({ children }: { children: ReactNode }) {
       pendingPayloadRef.current = null;
       const nextKpis: KpiSnapshot | null = payload.kpis ?? null;
       const nextMachines: MachineStatus[] = payload.machines ?? [];
+
+      // Fire a browser push notification for each new CRITICAL anomaly we haven't seen yet.
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        const incoming: AnomalyEvent[] = payload.anomalies ?? [];
+        for (const anomaly of incoming) {
+          if (anomaly.severity === "CRITICAL" && !notifiedIdsRef.current.has(anomaly.id)) {
+            notifiedIdsRef.current.add(anomaly.id);
+            new Notification(`🚨 CRITICAL — ${anomaly.machineId}`, {
+              body: `${anomaly.lineId}: ${anomaly.summary}`,
+              tag: anomaly.id,   // deduplicates if the same alert fires twice
+              icon: "/favicon.ico"
+            });
+          }
+        }
+      }
 
       setState((prev) => {
         const prevMachineMap = new Map(

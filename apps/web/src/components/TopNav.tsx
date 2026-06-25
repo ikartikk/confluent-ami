@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import clsx from "clsx";
+import { useEffect, useState } from "react";
 import ChatPanel from "@/components/ChatPanel";
 
 const links = [
@@ -15,6 +18,20 @@ export default function TopNav({
   current: string;
   connection?: "connecting" | "live" | "reconnecting" | "offline";
 }) {
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission>("default");
+
+  useEffect(() => {
+    if (typeof Notification !== "undefined") {
+      setNotifPerm(Notification.permission);
+    }
+  }, []);
+
+  const requestNotifications = async () => {
+    if (typeof Notification === "undefined") return;
+    const result = await Notification.requestPermission();
+    setNotifPerm(result);
+  };
+
   const status = {
     live: { label: "Live", className: "bg-emerald-100 text-emerald-700" },
     connecting: { label: "Connecting", className: "bg-slate-100 text-slate-600" },
@@ -35,6 +52,20 @@ export default function TopNav({
         >
           {status[connection].label}
         </span>
+        {notifPerm !== "granted" && notifPerm !== "denied" && (
+          <button
+            onClick={requestNotifications}
+            className="rounded-full border border-panel-border bg-white px-3 py-1 text-xs font-semibold text-muted hover:text-ink"
+            title="Enable CRITICAL alert notifications"
+          >
+            🔔 Enable Alerts
+          </button>
+        )}
+        {notifPerm === "granted" && (
+          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+            🔔 Alerts On
+          </span>
+        )}
         <ChatPanel />
         <div className="flex gap-2 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-panel-border">
         {links.map((link) => (

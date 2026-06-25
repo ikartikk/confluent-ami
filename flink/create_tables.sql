@@ -178,3 +178,58 @@ CREATE TABLE `ai.agent.decisions` (
   'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_API_KEY}" password="${KAFKA_API_SECRET}";',
   'format' = 'json'
 );
+
+-- Sink: acks written by Flink's autonomous resolution agent
+CREATE TABLE `alerts.acks` (
+  `key` BYTES,
+  id STRING,
+  acknowledged_by STRING,
+  timestamp_ms BIGINT
+) WITH (
+  'connector' = 'kafka',
+  'topic' = 'alerts.acks',
+  'properties.bootstrap.servers' = '${BOOTSTRAP_SERVERS}',
+  'properties.security.protocol' = 'SASL_SSL',
+  'properties.sasl.mechanism' = 'PLAIN',
+  'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_API_KEY}" password="${KAFKA_API_SECRET}";',
+  'format' = 'json'
+);
+
+-- Sink: audit log of every autonomous action taken by Flink agents
+CREATE TABLE `actions.taken` (
+  `key` BYTES,
+  anomaly_id STRING,
+  machine_id STRING,
+  severity STRING,
+  action STRING,
+  reason STRING,
+  resolved_by STRING,
+  ts TIMESTAMP_LTZ(3)
+) WITH (
+  'connector' = 'kafka',
+  'topic' = 'actions.taken',
+  'properties.bootstrap.servers' = '${BOOTSTRAP_SERVERS}',
+  'properties.security.protocol' = 'SASL_SSL',
+  'properties.sasl.mechanism' = 'PLAIN',
+  'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_API_KEY}" password="${KAFKA_API_SECRET}";',
+  'format' = 'json'
+);
+
+-- Sink: anomalies escalated to human review by the autonomous agent
+CREATE TABLE `alerts.escalated` (
+  `key` BYTES,
+  anomaly_id STRING,
+  machine_id STRING,
+  severity STRING,
+  summary STRING,
+  reason STRING,
+  ts TIMESTAMP_LTZ(3)
+) WITH (
+  'connector' = 'kafka',
+  'topic' = 'alerts.escalated',
+  'properties.bootstrap.servers' = '${BOOTSTRAP_SERVERS}',
+  'properties.security.protocol' = 'SASL_SSL',
+  'properties.sasl.mechanism' = 'PLAIN',
+  'properties.sasl.jaas.config' = 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_API_KEY}" password="${KAFKA_API_SECRET}";',
+  'format' = 'json'
+);

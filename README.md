@@ -10,7 +10,7 @@ flowchart LR
   KAFKA --> FLINK[Confluent Cloud Flink SQL<br/>Topic-bound Tables<br/>AI model inference]
   FLINK -->|insights.anomalies<br/>kpis.rollup<br/>ai.agent.*| KAFKA
   KAFKA --> API[Kafka consumer + SSE<br/>/health + /api/chat]
-  API --> WEB[Next.js Ops Dashboard<br/>+ Ask AMI chat]
+  API --> WEB[Next.js Ops Dashboard<br/>+ Ask AMI chatbot]
   API -.->|grounded on live state| AZURE[Azure OpenAI]
   PROBE[tools/probe<br/>schema + latency test] -.->|own consumer group| KAFKA
   SCHEMA[(Confluent Schema Service)] --- KAFKA

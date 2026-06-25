@@ -15,16 +15,16 @@ SELECT
   line_id,
   machine_id,
   CASE
-    WHEN vibration_hz > 22 OR defect_rate > 0.06 THEN 'CRITICAL'
-    WHEN vibration_hz > 20 OR defect_rate > 0.04 THEN 'HIGH'
-    WHEN vibration_hz > 18 OR defect_rate > 0.03 THEN 'MEDIUM'
+    WHEN vibration_hz > 16.0 OR defect_rate > 0.035 THEN 'CRITICAL'
+    WHEN vibration_hz > 14.0 OR defect_rate > 0.025 THEN 'HIGH'
+    WHEN vibration_hz > 12.5 OR defect_rate > 0.018 THEN 'MEDIUM'
     ELSE 'LOW'
   END AS severity,
   CONCAT('Robot ', machine_id, ' anomaly: vibration ', CAST(vibration_hz AS STRING),
          ' Hz, defect rate ', CAST(defect_rate AS STRING)) AS summary,
   ts
 FROM `telemetry.robot`
-WHERE vibration_hz > 17 OR defect_rate > 0.02;
+WHERE vibration_hz > 12.5 OR defect_rate > 0.018;
 
 INSERT INTO `insights.anomalies` (
   key, agent_insights, id, line_id, machine_id, severity, summary, ts
@@ -38,16 +38,16 @@ SELECT
   line_id,
   CONCAT('LINE-', line_id) AS machine_id,
   CASE
-    WHEN defect_rate > 0.06 THEN 'CRITICAL'
-    WHEN defect_rate > 0.04 THEN 'HIGH'
-    WHEN defect_rate > 0.03 THEN 'MEDIUM'
+    WHEN defect_rate > 0.035 THEN 'CRITICAL'
+    WHEN defect_rate > 0.025 THEN 'HIGH'
+    WHEN defect_rate > 0.018 THEN 'MEDIUM'
     ELSE 'LOW'
   END AS severity,
   CONCAT('Quality alert: defect rate ', CAST(defect_rate AS STRING),
          ' for batch ', batch_id) AS summary,
   ts
 FROM `telemetry.quality`
-WHERE defect_rate > 0.02;
+WHERE defect_rate > 0.018;
 
 INSERT INTO `insights.anomalies` (
   key, agent_insights, id, line_id, machine_id, severity, summary, ts
@@ -268,3 +268,39 @@ LATERAL TABLE(
     MAP['debug','false']
   )
 ) AS agent_output(status, response);
+
+
+-- Agent 5: Autonomous Resolution Agent
+-- LOW/MEDIUM anomalies only. AI decides YES (auto-resolve) or NO (escalate to human).
+-- On YES: writes to alerts.acks + actions.taken (full audit trail, no human needed).
+-- On NO:  writes to alerts.escalated (human approval required).
+INSERT INTO `actions.taken`
+SELECT
+  CAST(NULL AS BYTES) AS key,
+  id AS anomaly_id,
+  machine_id,
+  severity,
+  CASE
+    WHEN agent_output.response LIKE '%DECISION: YES%' THEN 'auto-resolved'
+    ELSE 'escalated-to-human'
+  END AS action,
+  agent_output.response AS reason,
+  'ami-flink' AS resolved_by,
+  ts
+FROM `insights.anomalies` /*+ OPTIONS('scan.startup.mode'='latest-offset') */,
+LATERAL TABLE(
+  AI_RUN_AGENT(
+    'auto_resolve_agent',
+    CONCAT(
+      'Anomaly on machine ', machine_id, ' (', line_id, '). ',
+      'Severity: ', severity, '. ',
+      'Details: ', summary, '. ',
+      'Should this be auto-resolved by the system, or escalated to a human? ',
+      'Reply with exactly: DECISION: YES or DECISION: NO. Then one sentence reason.'
+    ),
+    id,
+    'agent_system_table',
+    MAP['debug', 'false']
+  )
+) AS agent_output(status, response)
+WHERE severity IN ('LOW', 'MEDIUM');
