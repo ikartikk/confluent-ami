@@ -37,6 +37,7 @@ type StreamState = {
   qualityHistory: HistoryPoint[];
   inventoryHistory: HistoryPoint[];
   supplyHistory: HistoryPoint[];
+  inPageAlerts: AnomalyEvent[];  // CRITICAL/HIGH alerts shown as in-page banner
 };
 
 const EMPTY_KPI: KpiSnapshot = {
@@ -67,7 +68,8 @@ const fallbackState: StreamState = {
   smoothedKpis: { ...EMPTY_KPI },
   qualityHistory: [],
   inventoryHistory: [],
-  supplyHistory: []
+  supplyHistory: [],
+  inPageAlerts: []
 };
 
 const HISTORY_SIZE = 40;
@@ -197,19 +199,31 @@ export function StreamProvider({ children }: { children: ReactNode }) {
       const nextKpis: KpiSnapshot | null = payload.kpis ?? null;
       const nextMachines: MachineStatus[] = payload.machines ?? [];
 
-      // Fire a browser push notification for each new CRITICAL anomaly we haven't seen yet.
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        const incoming: AnomalyEvent[] = payload.anomalies ?? [];
-        for (const anomaly of incoming) {
-          if (anomaly.severity === "CRITICAL" && !notifiedIdsRef.current.has(anomaly.id)) {
-            notifiedIdsRef.current.add(anomaly.id);
-            new Notification(`🚨 CRITICAL — ${anomaly.machineId}`, {
+      // Fire OS notification + in-page banner for new CRITICAL/HIGH anomalies.
+      const incoming: AnomalyEvent[] = payload.anomalies ?? [];
+      const freshAlerts: AnomalyEvent[] = [];
+      for (const anomaly of incoming) {
+        if (
+          (anomaly.severity === "CRITICAL" || anomaly.severity === "HIGH") &&
+          !notifiedIdsRef.current.has(anomaly.id)
+        ) {
+          notifiedIdsRef.current.add(anomaly.id);
+          freshAlerts.push(anomaly);
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            const icon = anomaly.severity === "CRITICAL" ? "🚨" : "⚠️";
+            new Notification(`${icon} ${anomaly.severity} — ${anomaly.machineId}`, {
               body: `${anomaly.lineId}: ${anomaly.summary}`,
-              tag: anomaly.id,   // deduplicates if the same alert fires twice
+              tag: anomaly.id,
               icon: "/favicon.ico"
             });
           }
         }
+      }
+      if (freshAlerts.length > 0) {
+        setState((prev) => ({
+          ...prev,
+          inPageAlerts: [...freshAlerts, ...prev.inPageAlerts].slice(0, 5)
+        }));
       }
 
       setState((prev) => {

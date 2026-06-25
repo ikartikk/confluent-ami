@@ -52,19 +52,25 @@ export default function TopNav({
         >
           {status[connection].label}
         </span>
-        {notifPerm !== "granted" && notifPerm !== "denied" && (
-          <button
-            onClick={requestNotifications}
-            className="rounded-full border border-panel-border bg-white px-3 py-1 text-xs font-semibold text-muted hover:text-ink"
-            title="Enable CRITICAL alert notifications"
-          >
-            🔔 Enable Alerts
-          </button>
-        )}
-        {notifPerm === "granted" && (
+        {notifPerm === "granted" ? (
           <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
             🔔 Alerts On
           </span>
+        ) : notifPerm === "denied" ? (
+          <span
+            className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-muted"
+            title="Notifications blocked in browser settings"
+          >
+            🔕 Alerts Blocked
+          </span>
+        ) : (
+          <button
+            onClick={requestNotifications}
+            className="rounded-full border border-panel-border bg-white px-3 py-1 text-xs font-semibold text-muted hover:text-ink"
+            title="Enable CRITICAL and HIGH alert notifications"
+          >
+            🔔 Enable Alerts
+          </button>
         )}
         <ChatPanel />
         <div className="flex gap-2 rounded-full bg-white px-3 py-2 shadow-sm ring-1 ring-panel-border">

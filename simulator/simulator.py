@@ -150,9 +150,8 @@ def tick_machine(machine_id):
     m = machine_state[machine_id]
 
     m["cycles_since_maintenance"] += 1
-    # Accelerated wear for demo: machines visibly degrade every ~5-10 ticks.
-    # MEDIUM ~10-20s, HIGH ~20-30s, CRITICAL ~30-40s from a low starting state.
-    wear_growth = 0.025 + random.uniform(0.0, 0.015)
+    # Demo timing: MEDIUM ~10-20s, HIGH ~60s, CRITICAL ~2min from a low starting state.
+    wear_growth = 0.008 + random.uniform(0.0, 0.005)
     m["wear"] = clamp(m["wear"] + wear_growth, 0.0, 2.0)
 
     # Vibration: base + wear component + noise
@@ -185,11 +184,11 @@ def tick_machine(machine_id):
     # vibration crosses MEDIUM (~12.5Hz) in ~5 ticks (10s),
     # HIGH (~14Hz) in ~8 ticks (16s), CRITICAL (~16Hz) in ~15 ticks (30s).
     status = "LOW"
-    if m["vibration_hz"] > 16.0 or m["defect_rate"] > 0.035:
+    if m["vibration_hz"] > 19.0 or m["defect_rate"] > 0.05:
         status = "CRITICAL"
-    elif m["vibration_hz"] > 14.0 or m["defect_rate"] > 0.025:
+    elif m["vibration_hz"] > 16.5 or m["defect_rate"] > 0.035:
         status = "HIGH"
-    elif m["vibration_hz"] > 12.5 or m["defect_rate"] > 0.018:
+    elif m["vibration_hz"] > 13.5 or m["defect_rate"] > 0.02:
         status = "MEDIUM"
 
     send("telemetry.robot", {

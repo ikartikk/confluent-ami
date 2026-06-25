@@ -2,14 +2,13 @@
   "title": "actions.taken",
   "type": "object",
   "properties": {
-    "anomaly_id":   { "type": "string", "description": "ID of the anomaly this action resolves" },
-    "machine_id":   { "type": "string" },
-    "severity":     { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
-    "action":       { "type": "string", "enum": ["auto-resolved", "escalated-to-human"] },
-    "reason":       { "type": "string", "description": "Full AI agent response explaining the decision" },
-    "resolved_by":  { "type": "string", "description": "Agent that took the action, e.g. 'ami-flink'" },
-    "ts":           { "type": "string", "format": "date-time" }
+    "anomaly_id":  { "type": "string" },
+    "machine_id":  { "type": "string" },
+    "severity":    { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+    "action":      { "type": "string", "enum": ["auto-resolved", "escalated-to-human"] },
+    "reason":      { "type": "string" },
+    "resolved_by": { "type": "string" },
+    "ts":          { "type": "string", "format": "date-time" }
   },
-  "required": ["anomaly_id", "machine_id", "severity", "action", "reason", "resolved_by", "ts"],
-  "additionalProperties": false
+  "required": ["anomaly_id", "machine_id", "severity", "action", "reason", "resolved_by", "ts"]
 }

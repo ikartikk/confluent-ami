@@ -15,16 +15,16 @@ SELECT
   line_id,
   machine_id,
   CASE
-    WHEN vibration_hz > 16.0 OR defect_rate > 0.035 THEN 'CRITICAL'
-    WHEN vibration_hz > 14.0 OR defect_rate > 0.025 THEN 'HIGH'
-    WHEN vibration_hz > 12.5 OR defect_rate > 0.018 THEN 'MEDIUM'
+    WHEN vibration_hz > 19.0 OR defect_rate > 0.05 THEN 'CRITICAL'
+    WHEN vibration_hz > 16.5 OR defect_rate > 0.035 THEN 'HIGH'
+    WHEN vibration_hz > 13.5 OR defect_rate > 0.02 THEN 'MEDIUM'
     ELSE 'LOW'
   END AS severity,
   CONCAT('Robot ', machine_id, ' anomaly: vibration ', CAST(vibration_hz AS STRING),
          ' Hz, defect rate ', CAST(defect_rate AS STRING)) AS summary,
   ts
 FROM `telemetry.robot`
-WHERE vibration_hz > 12.5 OR defect_rate > 0.018;
+WHERE vibration_hz > 13.5 OR defect_rate > 0.02;
 
 INSERT INTO `insights.anomalies` (
   key, agent_insights, id, line_id, machine_id, severity, summary, ts
@@ -280,7 +280,6 @@ LATERAL TABLE(
 
 INSERT INTO `actions.taken`
 SELECT
-  CAST(NULL AS BYTES)                                               AS key,
   id                                                                AS anomaly_id,
   machine_id,
   severity,
@@ -313,8 +312,8 @@ WHERE severity IN ('LOW', 'MEDIUM');
 INSERT INTO `alerts.acks`
 SELECT
   CAST(NULL AS BYTES)         AS key,
-  id                          AS id,
   'ami-flink'                 AS acknowledgedBy,
+  id                          AS id,
   CAST(ts AS STRING)          AS `timestamp`
 FROM `insights.anomalies` /*+ OPTIONS('scan.startup.mode'='latest-offset') */,
 LATERAL TABLE(
